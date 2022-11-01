@@ -1,0 +1,226 @@
+---
+title: "EDA_ECommerce"
+author: "Wilson"
+date: "10/24/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(fpp3)
+library(plotly)
+library(cowplot)
+```
+
+# Importing Data
+```{r}
+Raw_ECommerce_data <- read_csv(here::here("EDA_ECommerce/E-Commerce Business Transactions/Sales Transaction v.4a.csv"))
+```
+# Data Background Check 
+```{r}
+which(is.na(Raw_ECommerce_data))
+colSums(is.na(Raw_ECommerce_data))
+sum(is.na(Raw_ECommerce_data))
+```
+# How was the sales trend over the months? 
+# What are the most frequently purchased products?
+# How many products does the customer purchase in each transaction? 
+# What are the most profitable segment customers? 
+# Based on your findings, what strategy could you recommend to the business to gain more profit? 
+
+```{r}
+Raw_ECommerce_data %>% arrange(Date)
+```
+
+# Identifying the sales trend over the months 
+# Overall 
+# For each Country 
+
+#2. Arrange the data from the earliest to the latest to identify sales trend over the period 
+#1. Format the date into dd/mm/yyyy
+
+# date formatting, in reality, the data is from December 2018 to December 2019 
+
+```{r}
+#Date Formatting 
+Raw_ECommerce_data <- Raw_ECommerce_data %>% 
+  mutate(Date = as.Date(Date, format = '%m/%d/%Y')) %>% arrange(Date)
+
+# Dataset Preparation for 
+Sales_Trend <- Raw_ECommerce_data %>% 
+  group_by(yearmonth(Date)) %>% 
+  summarise(Total_Sales = n()) %>% 
+  rename("Year_Month" = "yearmonth(Date)")
+
+#Visualisation generated with interactivity 
+ggplotly(Sales_Trend %>% ggplot(aes(x = Year_Month,
+                           y = Total_Sales)) +
+  geom_line() + 
+  ggtitle("Sales Trend December 2018 - December 2019") +
+  xlab("Date"))
+
+ggplotly(Sales_Trend %>% ggplot(aes(x = Year_Month,
+                           y = Total_Sales)) +
+  geom_line() + 
+  ggtitle("Sales Trend December 2018 - December 2019") +
+  xlab("Date"))
+```
+
+
+#2 What are the most frequently purchased products?
+# Based on the analysis, the top 3 products being purchased in the year are Cream Hanging Heart T-Light Holder, 
+# Regency Cakestand 3 Tier and Jumbo Bag Red Retrospot. 
+```{r}
+Top3_Products <- Raw_ECommerce_data %>% group_by(ProductName) %>% 
+  tally() %>% 
+  rename("No_Times_Purchased" = 'n') %>% 
+  arrange(-No_Times_Purchased) %>% 
+  head(3)
+
+# Bar Chart showing the top 3 products sold from December 2018 to December 2019 
+ggplot(Top3_Products, aes(x = ProductName, y = No_Times_Purchased, fill = ProductName)) + 
+  geom_bar(stat="identity") +
+  ggtitle("Top 3 Products Purchased December 2018 to December 2019")
+
+```
+# Sub Question: The purchase pattern throughout the year, was it a one-off purchase due to an event happening? Or was it a day to day use item for consumers? (Requires the Date Column) 
+
+# It seems that there are some similar short term patterns between sales trend of the top 3 products 
+# However, these patterns does not remain consistent over the year however, it does mimic the
+# the general sales trend of the year in the e-commerce platform. 
+
+```{r}
+Top3_Products_Info <- Raw_ECommerce_data %>% 
+  filter(ProductName == Top3_Products$ProductName) %>% 
+  group_by(ProductName, yearmonth(Date)) %>%
+  rename("Year_Month" = "yearmonth(Date)") %>% 
+  summarise(Total_Sales = n()) %>% 
+  arrange(ProductName) 
+  
+ggplotly(ggplot(Top3_Products_Info, aes(x = Year_Month, 
+                               y = Total_Sales,
+                               group = ProductName,
+                               color = ProductName)) +
+  geom_line() + 
+  ggtitle("Top 3 Products Sales Trend December 2018 - December 2019"))
+```
+
+
+
+#3 How many products does the customer purchase in each transaction? 
+# (On average how many products does each customer purchase)
+# Average Purchase Per Customer (No of products Purchased/No of Customers)
+# Looking into KPIs
+```{r}
+# Average Order Value (Total Revenues  Divide By )
+sum(Raw_ECommerce_data[, "Price"])/n_distinct(Raw_ECommerce_data$TransactionNo)
+
+# Identifying the Average Order Value for the top 3 country 
+Raw_ECommerce_data %>% 
+  group_by(Country) %>% 
+  summarise(Average_Order_Value = sum(Price)/n_distinct(TransactionNo))
+
+# Purchase Frequency 
+n_distinct(Raw_ECommerce_data$TransactionNo)/n_distinct(Raw_ECommerce_data$CustomerNo)
+
+
+# Identifying the Purchase Frequency value for the top 3 country
+Raw_ECommerce_data %>% 
+  group_by(Country) %>% 
+  summarise(Purchase_Frequency = n_distinct(TransactionNo)/n_distinct(CustomerNo))
+
+
+# Repeat Purchase Ratio (Number of customers purchasing more than once/number of customers)
+
+# Identify the number of customers that purchase more than once 
+
+# Getting all the transactions that were not cancelled
+Completed_Transactions <- Raw_ECommerce_data %>% filter(!str_detect(TransactionNo, 'C'))
+
+# Repeat Purchase Ratio
+length(which(table(Completed_Transactions$CustomerNo) > 1))/n_distinct(Completed_Transactions$CustomerNo)
+
+# Repeat Purchase Ratio for the top 3 countries 
+Completed_Transactions %>% 
+  group_by(Country) %>%
+  summarise(Repeat_Purchase_Ratio = length(which(table(CustomerNo) > 1))/n_distinct(CustomerNo))
+
+
+```
+
+
+#4 What are the most profitable segment customers? 
+# Segment using countries? 
+# Segment Customers based on the revenue earned? 
+# Create a distribution of revenue gained 
+
+# Define Profitability as the amount of revenue gained based on the segment criteria 
+# The Top 3 Country based on Sales Volume 
+# The top 3 countries based on Sales Revenue 
+
+# FINDINGS
+# Based on the analysis, UK is the country with the highest sales revenue and volume which is expected as 
+# the B2C is based in UK, thus it would be more widely known by people in UK. 
+# An interesting finding is that high sales volume is not necessarily correlated with sales revenue. As it 
+# can be shown that the Top 2 and 3 countries for sales revenue and volume are different. 
+# This finding provides the E-Commerce business insights on potential strategy to be implemented in different countries. 
+
+```{r}
+Top3_Sales_Country <- Raw_ECommerce_data %>% 
+  group_by(Country) %>% 
+  summarise(Total_Sales = n_distinct(TransactionNo)) %>% 
+  arrange(-Total_Sales) %>% 
+  head(3)
+
+
+# Total Revenue based on countries 
+Top5_Revenue_Country <- Raw_ECommerce_data %>% 
+  group_by(Country) %>% 
+  summarise(Total_Revenue_Dollars = sum(Price * Quantity)) %>% 
+  arrange(-Total_Revenue_Dollars) %>% 
+  head(3)
+
+
+Top3_Sales_Country_Graph <- Top3_Sales_Country %>% ggplot(aes(x= Country, 
+                                  y = Total_Sales,
+                                  fill = Country)) +
+  geom_bar(stat ="identity") +
+  ggtitle("Top 3 Sales Volume Country")
+
+Top3_Revenue_Country_Graph <- Top5_Revenue_Country %>% ggplot(aes(x= Country, 
+                                  y = Total_Revenue_Dollars,
+                                  fill = Country)) +
+  geom_bar(stat ="identity") +
+  ggtitle("Top 3 Sales Revenue Country")
+
+
+Top3_Sales_Country_Graph 
+Top3_Revenue_Country_Graph
+
+```
+
+
+
+
+#5 Based on your findings, what strategy could you recommend to the business to gain more profit? 
+# Definitely Look into other countries other than UK
+# Base the explanations based on some KPIs that was shown above 
+# Purchase Frequency => countries with high purchase frequency may mean that consumers from that country 
+# is comfortable and enjoy online shopping, could potentially target those consumers to gain profits 
+# More variables provided may help in better analysis and thus better facilitates business decision making and strategy implementation. 
+
+
+
+
+
+
+
+
+
+
+
